@@ -133,8 +133,10 @@ EKA (Evolving Kognitive Assistant) is an AI-powered assistant designed to suppor
 **Technology**:
 - RAG (Retrieval-Augmented Generation)
 - Embeddings model for semantic search
-- Simple vector store (FAISS or similar)
-- Small LLM for response generation (mistral-7b, llama-2, or similar)
+- PostgreSQL + pgvector for vector storage (within free database stack)
+- LLM for response generation:
+  - **Primary**: Gemini API (free tier)
+  - **Fallback**: Qwen3-4B-Instruct-2507 (local, free)
 
 **Key Features**:
 - Answers only from approved mission/experiment documents
@@ -325,11 +327,12 @@ Knowledge Assistant → Backend → Dashboard
 |-------|-----------|-----------|
 | Vision | YOLOv5/v8 | Fast, accurate, well-documented |
 | Activity Recognition | PyTorch + temporal models | Flexible, good for custom datasets |
-| Knowledge Assistant | RAG + embeddings + small LLM | Offline, grounded, cost-effective |
+| Knowledge Assistant | RAG + Gemini API (primary) + Qwen3-4B (fallback) + PostgreSQL + pgvector | Free tier, offline capable, grounded |
 | Experiment Tracking | Python state machine | Deterministic, auditable |
 | Safety Logic | Rule-based Python | No AI in safety-critical paths |
-| Backend | FastAPI + PostgreSQL | Simple, fast, easy to test |
+| Backend | FastAPI + PostgreSQL (Supabase free tier) | Simple, fast, easy to test |
 | Frontend | React | Modern, reactive, widely known |
+| Vector Storage | PostgreSQL + pgvector | Integrated with free database stack |
 | Deployment | Docker containers | Easy to replicate, version control |
 
 ---
