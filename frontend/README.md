@@ -16,7 +16,7 @@ The Frontend Dashboard is the astronaut's and mission control's window into the 
 - System status
 
 **Owner**: Member 6  
-**Framework**: React  
+**Framework**: Next.js (React-based full-stack framework)  
 **Real-Time**: WebSocket  
 **Styling**: TailwindCSS  
 
