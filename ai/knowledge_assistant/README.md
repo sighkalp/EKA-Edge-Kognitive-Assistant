@@ -6,11 +6,11 @@
 
 ## Overview
 
-The Knowledge Assistant is a Retrieval-Augmented Generation (RAG) system that answers astronaut questions by searching approved documents. It combines semantic search with a small language model to provide grounded, sourced answers.
+The Knowledge Assistant is a Retrieval-Augmented Generation (RAG) system that answers astronaut questions by searching approved documents. It combines semantic search with LLM-based response generation to provide grounded, sourced answers.
 
 **Owner**: Member 3  
 **Dependencies**: None (self-contained)  
-**Technology**: RAG, embeddings, FAISS, small LLM (mistral-7b or similar)
+**Technology**: RAG, embeddings, PostgreSQL + pgvector, Gemini API (primary) + Qwen3-4B-Instruct-2507 (local fallback)
 
 ---
 
@@ -105,8 +105,9 @@ from ai.knowledge_assistant import KnowledgeAssistant
 
 # Initialize
 assistant = KnowledgeAssistant(
-    vector_store_path="data/vectorstore/",
-    llm_model="mistral-7b-instruct",
+    vector_store_path="postgresql://user:pass@localhost/eka_db",  # PostgreSQL + pgvector
+    llm_model="gemini",  # Primary: Gemini API
+    llm_fallback="qwen3-4b-instruct-2507",  # Fallback: Local Qwen3-4B
     embeddings_model="all-minilm-l6-v2"
 )
 
@@ -152,14 +153,33 @@ python ai/knowledge_assistant/cli.py --interactive
 ### LLM Selection
 
 ```python
-# Lightweight (faster, less accurate)
-assistant = KnowledgeAssistant(llm_model="llama-2-7b")
+# Primary: Gemini API (free tier, recommended for production)
+assistant = KnowledgeAssistant(
+    llm_model="gemini",
+    api_key="your-gemini-api-key"
+)
 
-# Recommended (balanced)
-assistant = KnowledgeAssistant(llm_model="mistral-7b-instruct")
+# Fallback: Local Qwen3-4B (free, no API key needed)
+assistant = KnowledgeAssistant(
+    llm_model="qwen3-4b-instruct-2507",
+    llm_mode="local"  # Runs locally, no internet required
+)
 
-# Powerful (slower, more accurate)
-assistant = KnowledgeAssistant(llm_model="neural-chat-7b")
+# Test/Dev: Small local model (faster but less accurate)
+assistant = KnowledgeAssistant(
+    llm_model="qwen1.5-1.8b",
+    llm_mode="local"
+)
+```
+
+### Vector Store Configuration
+
+```python
+# PostgreSQL + pgvector (integrated with Supabase free tier)
+assistant = KnowledgeAssistant(
+    vector_store="postgresql",
+    database_url="postgresql://user:pass@localhost:5432/eka_db"
+)
 ```
 
 ### Search Strategy
@@ -425,12 +445,21 @@ def verify_answer(answer, sources):
 
 See `ai/knowledge_assistant/requirements.txt`:
 ```
+# Core RAG + Embeddings
 transformers==4.35.2
 torch==2.1.1
-faiss-cpu==1.7.4
-langchain==0.0.347
 sentence-transformers==2.2.2
+langchain==0.0.347
 pydantic==2.5.0
+
+# Vector Storage (PostgreSQL + pgvector)
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+pgvector==0.3.0
+
+# LLM APIs & Local Models
+google-generativeai==0.4.0  # Gemini API
+ollama==0.1.8  # Qwen3-4B local fallback
 ```
 
 ---

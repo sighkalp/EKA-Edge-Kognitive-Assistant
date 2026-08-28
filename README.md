@@ -170,11 +170,12 @@ EKA is organized into 7 core modules:
 |-------|-----------|-----------|
 | Vision | YOLOv5/v8 | Real-time, production-ready |
 | Activity | PyTorch + 3D CNN | Flexible temporal modeling |
-| Knowledge | RAG + FAISS + mistral-7b | Offline, grounded, cost-effective |
+| Knowledge | RAG + Gemini API (primary) + Qwen3-4B (fallback) + pgvector | Free tier, offline capable, grounded |
 | Experiment | Python state machine | Deterministic, auditable |
 | Safety | Rule-based Python | No AI, explainable |
-| Backend | FastAPI + PostgreSQL | Fast, async, reliable |
+| Backend | FastAPI + PostgreSQL (Supabase) | Fast, async, reliable |
 | Frontend | React + WebSocket | Responsive, real-time |
+| Vector Store | PostgreSQL + pgvector | Integrated with free database stack |
 | Deployment | Docker | Reproducible, portable |
 
 ---
