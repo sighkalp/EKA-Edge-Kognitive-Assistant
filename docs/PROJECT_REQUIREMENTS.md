@@ -348,4 +348,5 @@ EKA (Evolving Kognitive Assistant) is an AI-powered mission support system desig
 Requirements can be modified by team consensus and documented in this file with a change log entry.
 
 ### Change Log
+- v1.1 (2026-08-29): Architecture and documentation standardized to the current EKA stack and ownership model
 - v1.0 (2024-01-15): Initial requirements document

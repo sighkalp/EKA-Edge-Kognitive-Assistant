@@ -1,94 +1,109 @@
 # Frontend Dashboard
 
-**Responsibility**: Display mission state, experiment progress, alerts, and facilitate astronaut interaction.
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
+**Responsibility**: Provide the user-facing mission dashboard and client-side interaction layer.
 
 ---
 
 ## Overview
 
-The Frontend Dashboard is the astronaut's and mission control's window into the mission. It displays:
+The frontend is a Next.js application built with React and TypeScript. It serves as the user interface for mission monitoring and operations, but it is not the application backend.
 
-- Real-time video with detected objects
-- Current activity and procedure step
-- Active alerts and warnings
-- Q&A interface
-- Mission timeline
-- System status
+The frontend is responsible for:
+- visualizing mission state and events
+- presenting alerts and safety status
+- allowing user queries and operator actions
+- rendering experiment progress and timelines
+- consuming FastAPI responses over REST and WebSocket
 
-**Owner**: Member 6  
-**Framework**: Next.js (React-based full-stack framework)  
-**Real-Time**: WebSocket  
-**Styling**: TailwindCSS  
-
----
-
-## Features
-
-### Astronaut View
-- Video feed with object bounding boxes
-- Current procedure step and progress
-- Prominent alert display
-- Q&A input and response
-- Emergency stop button
-
-### Mission Control View
-- Overview of active missions
-- Experiment state for multiple astronauts
-- Complete event timeline
-- Audit log viewer
-- Analytics and reporting
+**Stack**:
+- Next.js
+- React
+- TypeScript
+- Axios
+- WebSocket
 
 ---
 
-## Installation
+## Ownership Model
+
+```text
+Frontend (Next.js/React/TypeScript)
+        |
+        | Axios requests to FastAPI
+        | WebSocket stream from FastAPI
+        v
+FastAPI Backend
+```
+
+This repository standard explicitly keeps Next.js as a frontend-only layer. It does not use Next.js API Routes as the application backend.
+
+---
+
+## Local Development
 
 ```bash
 cd frontend
 npm install
+npm run dev
+```
+
+Development URL:
+- http://localhost:3000
+
+---
+
+## Production Build
+
+```bash
+cd frontend
+npm run build
 npm start
 ```
 
-Runs at `http://localhost:3000`
+This distinguishes development mode (`npm run dev`) from production mode (`npm run build` + `npm start`).
 
 ---
 
-## Structure
+## Key UI Areas
 
-```
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── VideoFeed.jsx
-│   │   ├── ProcedurePanel.jsx
-│   │   ├── AlertBoard.jsx
-│   │   ├── QAInterface.jsx
-│   │   └── Timeline.jsx
-│   ├── pages/
-│   │   ├── AstronautView.jsx
-│   │   ├── MissionControl.jsx
-│   │   └── Dashboard.jsx
-│   ├── services/
-│   │   ├── api.js
-│   │   └── websocket.js
-│   └── App.jsx
-├── public/
-└── package.json
-```
+### Mission dashboard
+- live experiment overview
+- procedure progress
+- current step context
+- status banners and alert summaries
+
+### Video and monitoring view
+- object detection overlays
+- current mission camera feed
+- system status indicators
+
+### Knowledge interface
+- user questions
+- grounded responses from the backend
+- source references
+
+### Timeline and operational log
+- mission events
+- experiment transitions
+- alerts and warnings history
 
 ---
 
-## Real-Time Updates
+## Data Access
 
-Uses WebSocket to receive updates from backend:
+Use Axios for REST access to FastAPI endpoints.
 
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/mission/mission_001');
+```ts
+const response = await axios.get('http://localhost:8000/api/mission/mission_001/state');
+```
 
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  // Handle: vision, activity, experiment state, safety alerts
-  updateDashboard(update);
-};
+Use WebSocket for real-time updates from the backend.
+
+```ts
+const socket = new WebSocket('ws://localhost:8000/ws/mission/mission_001');
 ```
 
 ---
@@ -96,33 +111,25 @@ ws.onmessage = (event) => {
 ## Testing
 
 ```bash
+cd frontend
 npm test
-
-# With coverage
-npm test -- --coverage
 ```
 
----
-
-## Build
-
-```bash
-npm run build
-# Outputs to build/
-```
+Recommended stack:
+- Vitest
+- React Testing Library
 
 ---
 
 ## Deployment
 
-```bash
-npm run build
-npm run serve
-# Or use nginx to serve build/ folder
-```
+The frontend is deployed in Docker as a Next.js application and communicates with the FastAPI backend and PostgreSQL + pgvector data layer.
 
 ---
 
-**For detailed setup**: See `frontend/README.md` after implementation
+## Standardization Notes
 
-**Status**: Ready for implementation
+- Next.js is frontend-only.
+- The backend remains Python + FastAPI.
+- No backend logic is implemented in Next.js API Routes.
+- The frontend consumes the backend contract rather than directly invoking internal modules.

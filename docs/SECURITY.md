@@ -467,6 +467,6 @@ For security concerns or incident reports:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2024-01-15  
-**Next Review**: 2024-04-15
+**Document Version**: 1.1  
+**Last Updated**: 2026-08-29  
+**Next Review**: 2026-11-29

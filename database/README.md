@@ -1,125 +1,122 @@
 # Database
 
-**Responsibility**: Persistent storage for missions, experiments, astronauts, events, and audit logs.
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
+**Responsibility**: Persistent storage for mission data, embeddings, events, and audit records.
 
 ---
 
 ## Overview
 
-PostgreSQL database for EKA. Stores:
+The repository standardizes on PostgreSQL + pgvector as the database layer.
 
-- Mission metadata and timelines
-- Experiment definitions and instances
-- Astronaut and mission control users
-- All system events (vision, activity, alerts)
-- Immutable audit logs
-- User sessions and authentication
+Deployment model:
+- Local PostgreSQL + pgvector for development
+- Optional Supabase PostgreSQL + pgvector for cloud deployment
 
-**Technology**: PostgreSQL 12+  
-**ORM**: SQLAlchemy  
-**Migrations**: Alembic  
+Persistence is accessed through SQLAlchemy and migrations are managed with Alembic.
 
 ---
 
-## Schema Overview
+## Technology Stack
 
-### Core Tables
+- PostgreSQL
+- pgvector
+- SQLAlchemy
+- Alembic
 
-**missions**
+---
+
+## Schema Goals
+
+The database should support:
+- mission metadata and lifecycle state
+- experiment definitions and progress
+- event logs and timeline data
+- vector embeddings for knowledge retrieval
+- audit logs and user metadata
+
+## Example Core Tables
+
 ```sql
-id, name, description, astronauts, start_time, end_time, status
-```
+missions (
+  id,
+  name,
+  description,
+  status,
+  created_at,
+  updated_at
+)
 
-**experiments**
-```sql
-id, definition_id, mission_id, astronaut_id, status, current_step, started_at
-```
+experiments (
+  id,
+  mission_id,
+  definition_id,
+  status,
+  current_step,
+  started_at,
+  updated_at
+)
 
-**astronauts**
-```sql
-id, name, email, password_hash, role
-```
+events (
+  id,
+  mission_id,
+  type,
+  source_module,
+  payload,
+  created_at
+)
 
-**events**
-```sql
-id, mission_id, type, timestamp, data, source_module
-```
+embeddings (
+  id,
+  document_id,
+  chunk_text,
+  embedding,
+  metadata,
+  created_at
+)
 
-**audit_logs**
-```sql
-id, user_id, action, resource_id, input, output, timestamp, ip_address
+audit_logs (
+  id,
+  user_id,
+  action,
+  resource_id,
+  request_payload,
+  result_payload,
+  created_at
+)
 ```
 
 ---
 
-## Setup
+## Local Setup
 
-### Create Database
 ```bash
 createdb eka_db
-createuser eka_user --password
 ```
 
-### Run Migrations
+Then configure the application connection string in `.env`.
+
+---
+
+## Migrations
+
 ```bash
+alembic revision --autogenerate -m "Add new table"
 alembic upgrade head
 ```
 
-### Seed Demo Data
-```bash
-python database/scripts/seed_demo.py
-```
+---
+
+## Optional Cloud Deployment
+
+Supabase PostgreSQL + pgvector may be used as a deployment option, but local PostgreSQL + pgvector remains the default development database.
 
 ---
 
-## Queries
+## Notes
 
-### Recent Events
-```sql
-SELECT * FROM events 
-WHERE mission_id = 'mission_001' 
-ORDER BY timestamp DESC 
-LIMIT 100;
-```
-
-### Experiment Progress
-```sql
-SELECT e.id, COUNT(s.id) as completed_steps
-FROM experiments e
-LEFT JOIN experiment_steps s ON s.experiment_id = e.id AND s.status = 'completed'
-WHERE e.mission_id = 'mission_001'
-GROUP BY e.id;
-```
-
-### Audit Trail
-```sql
-SELECT * FROM audit_logs
-WHERE user_id = 'ast_001' AND timestamp > NOW() - INTERVAL '7 days'
-ORDER BY timestamp DESC;
-```
-
----
-
-## Backups
-
-```bash
-# Backup
-pg_dump eka_db > backup.sql
-
-# Restore
-psql eka_db < backup.sql
-```
-
----
-
-## Performance
-
-- Indexes on frequently queried columns (mission_id, timestamp)
-- Partitioning for large tables (events, audit_logs)
-- Connection pooling via SQLAlchemy
-
----
-
-**For detailed setup**: See `database/README.md` after implementation
-
-**Status**: Ready for implementation
+- EKA uses PostgreSQL + pgvector as the canonical vector-enabled database.
+- ChromaDB and other external vector stores are not part of the standardized architecture.
+- The frontend does not directly access the database; FastAPI owns the database boundary.

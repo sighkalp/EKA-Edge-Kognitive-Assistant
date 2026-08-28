@@ -1,10 +1,36 @@
 # API Contracts - EKA Module Interfaces
 
-All modules communicate through these standardized JSON interfaces. **Do not change these contracts without updating this document and notifying all team members.**
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
+All modules communicate through standardized JSON interfaces. The frontend communicates only with the FastAPI backend. FastAPI is the API boundary and orchestrates internal Python services and data access.
 
 ---
 
-## 1. Vision Engine Output
+## 1. Ownership and Routing
+
+```text
+Frontend (Next.js + React + TypeScript)
+        |
+        | Axios / WebSocket
+        v
+FastAPI backend
+        |
+        +--> data access layer / persistence
+        +--> internal Python services
+        |      - vision
+        |      - activity recognition
+        |      - knowledge assistant
+        |      - experiment engine
+        |      - safety engine
+        +--> response formatting
+```
+
+This contract set documents the internal payloads exposed to FastAPI and consumed by the frontend. Direct frontend-to-module communication is not part of the standardized architecture.
+
+---
+
+## 2. Vision Engine Output
 
 **Source Module**: `ai/vision/`
 
@@ -31,17 +57,6 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
         "suit_color": "white",
         "helmet_on": true
       }
-    },
-    {
-      "id": "obj_002",
-      "class_name": "sample_container",
-      "confidence": 0.88,
-      "bbox": {
-        "x": 400,
-        "y": 200,
-        "width": 80,
-        "height": 100
-      }
     }
   ],
   "processing_time_ms": 45,
@@ -49,30 +64,15 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
 }
 ```
 
-**Field Descriptions**:
-- `timestamp`: Unix timestamp of frame capture
-- `frame_id`: Unique frame identifier for tracking
-- `objects`: Array of detected objects
-  - `id`: Unique object ID (for tracking across frames)
-  - `class_name`: Object category (astronaut, equipment, sample, chamber, etc.)
-  - `confidence`: Detection confidence [0.0, 1.0]
-  - `bbox`: Bounding box in pixels
-  - `attributes`: Optional object-specific metadata
-- `processing_time_ms`: Inference latency
-- `status`: "success" or "error"
-
-**Error Response**:
-```json
-{
-  "status": "error",
-  "error_code": "INVALID_FRAME",
-  "message": "Frame data is null or corrupted"
-}
-```
+**Technology**:
+- Ultralytics
+- YOLO11n
+- PyTorch
+- OpenCV
 
 ---
 
-## 2. Activity Recognition Output
+## 3. Activity Recognition Output
 
 **Source Module**: `ai/activity_recognition/`
 
@@ -90,14 +90,8 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
     "duration_seconds": 3.2
   },
   "alternative_activities": [
-    {
-      "name": "adjusting_equipment",
-      "confidence": 0.04
-    },
-    {
-      "name": "idle",
-      "confidence": 0.02
-    }
+    { "name": "adjusting_equipment", "confidence": 0.04 },
+    { "name": "idle", "confidence": 0.02 }
   ],
   "video_segment": {
     "start_frame": 120,
@@ -108,31 +102,14 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
 }
 ```
 
-**Field Descriptions**:
-- `timestamp`: When activity was recognized
-- `subject_id`: ID of the person performing the activity
-- `activity`: Primary recognized activity
-  - `name`: Activity class name (e.g., placing_sample, securing_chamber, taking_measurement)
-  - `confidence`: Recognition confidence [0.0, 1.0]
-  - `duration_seconds`: How long the activity took
-- `alternative_activities`: Top N alternatives (for debugging/analysis)
-- `video_segment`: Frame range of the activity
-- `processing_time_ms`: Model inference time
-- `status`: "success" or "error"
-
-**Activity Classes** (non-exhaustive):
-- `idle`
-- `walking`
-- `adjusting_equipment`
-- `placing_sample`
-- `securing_chamber`
-- `taking_measurement`
-- `recording_observation`
-- `emergency_stop`
+**Technology**:
+- PyTorch
+- Torchvision
+- R3D-18
 
 ---
 
-## 3. Experiment Engine Output
+## 4. Experiment Engine Output
 
 **Source Module**: `experiment_engine/`
 
@@ -166,12 +143,6 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
       "name": "Prepare workspace",
       "status": "completed",
       "timestamp": 1629907100
-    },
-    {
-      "step": 2,
-      "name": "Gather materials",
-      "status": "completed",
-      "timestamp": 1629907150
     }
   ],
   "context": {
@@ -183,25 +154,12 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
 }
 ```
 
-**Field Descriptions**:
-- `experiment_id`: Unique experiment instance ID
-- `mission_id`: Parent mission ID
-- `status`: "pending", "in_progress", "paused", "completed", "error"
-- `current_step`: Details of the current procedure step
-  - `step_number`: Procedural step number
-  - `title`: Human-readable step description
-  - `duration_seconds`: Expected step duration
-  - `elapsed_seconds`: How long we've been on this step
-  - `expected_activities`: Activities expected during this step
-- `procedure`: Overall procedure progress
-- `timeline`: Historical record of completed steps
-- `context`: Contextual metadata
-- `timestamp`: When state was captured
-- `status`: "success" or "error"
+**Technology**:
+- Python state machine
 
 ---
 
-## 4. Safety Engine Output
+## 5. Safety Engine Output
 
 **Source Module**: `safety_engine/`
 
@@ -215,9 +173,72 @@ All modules communicate through these standardized JSON interfaces. **Do not cha
   "deviation_detected": false,
   "check_type": "procedure_compliance",
   "alerts": [],
-  "warnings": [
+  "warnings": [],
+  "status": "success"
+}
+```
+
+**Safety rule requirement**:
+- Deterministic Python rules only.
+- No LLM dependency for safety decisions.
+
+---
+
+## 6. Knowledge Assistant Output
+
+**Source Module**: `ai/knowledge_assistant/`
+
+**Endpoint (if exposed)**: `POST /api/knowledge/query`
+
+**Output JSON**:
+
+```json
+{
+  "query": "How do I secure the reaction chamber?",
+  "answer": "To secure the chamber, confirm seals are seated and tighten all fasteners before starting the reaction.",
+  "confidence": 0.92,
+  "sources": [
     {
-      "id": "warn_001",
+      "document_id": "SOP_2024_v1",
+      "section": "2.3.1",
+      "page": 7,
+      "snippet": "Secure the chamber ..."
+    }
+  ],
+  "status": "success"
+}
+```
+
+**Technology**:
+- Custom Python RAG pipeline
+- PostgreSQL + pgvector
+- Sentence Transformers embedding model: sentence-transformers/all-MiniLM-L6-v2
+- Gemini API as primary LLM
+- Ollama + Qwen3-4B-Instruct-2507 as local/offline fallback
+- PyMuPDF for PDF extraction
+
+---
+
+## 7. Common Error Shape
+
+```json
+{
+  "status": "error",
+  "error_code": "INVALID_INPUT",
+  "message": "The supplied payload is invalid."
+}
+```
+
+---
+
+## 8. Standardization Notes
+
+- The frontend is never treated as the backend.
+- FastAPI owns the public API boundary.
+- Internal modules expose service-level interfaces consumed by FastAPI.
+- PostgreSQL + pgvector is the standard vector-enabled data store.
+- Supabase PostgreSQL + pgvector is optional only for cloud deployments.
+- The architecture does not include ChromaDB or other vector databases.
       "severity": "info",
       "category": "procedure",
       "message": "Current step is running longer than expected (45s vs 30s avg)",
@@ -432,9 +453,10 @@ for obj in vision_output["objects"]:
 
 ## Version Control
 
-- **Current Version**: 1.0
-- **Last Updated**: 2024-01-15
+- **Current Version**: 1.1
+- **Last Updated**: 2026-08-29
 - **Next Review**: When new module is added or existing contract changes
 
 **Change Log**:
+- v1.1: Architecture standardized; frontend/backend ownership clarified; model stack aligned to current EKA stack
 - v1.0: Initial contracts for all 5 core modules

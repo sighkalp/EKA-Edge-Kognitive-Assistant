@@ -1,243 +1,262 @@
 # EKA Master Architecture
 
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
 ## Overview
 
-EKA (Evolving Kognitive Assistant) is an AI-powered assistant designed to support astronauts conducting experiments in future space-station and Biomedical Applications (BAS) environments. The system combines computer vision, activity recognition, knowledge retrieval, and safety engineering to provide real-time guidance and ensure experimental integrity.
+EKA is an AI-powered mission support assistant designed to support astronauts and ground teams during space-based and laboratory experiments. The system coordinates computer vision, activity analysis, retrieval-augmented knowledge, procedure tracking, and deterministic safety validation.
 
 ## Architecture Philosophy
 
-1. **Modularity**: Each subsystem has clear responsibility and defined interfaces
-2. **Replaceability**: AI models can be upgraded independently
-3. **Safety First**: Deterministic rules govern safety-critical decisions
-4. **Offline First**: Core functionality works without internet connectivity
-5. **Auditability**: All decisions and actions are logged for mission review
-6. **Student-Focused**: Practical technologies, no unnecessary complexity
+1. Clear ownership boundaries
+2. Replaceable model components
+3. Safety-first rule logic
+4. Local-first development with optional cloud deployment
+5. Auditability and traceability
+6. Standardized stack and documentation
+
+## Ownership and Request Flow
+
+Frontend -> FastAPI -> Internal Python services/modules -> PostgreSQL + pgvector
+
+The frontend is a Next.js React TypeScript application. It communicates with the backend through Axios and WebSocket channels. FastAPI is the only application backend. It orchestrates internal Python services for vision, activity recognition, knowledge retrieval, experiment state management, and safety evaluation.
 
 ## System Data Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        EKA MISSION FLOW                         │
-└─────────────────────────────────────────────────────────────────┘
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│                      EKA MISSION FLOW                           │
+└──────────────────────────────────────────────────────────────────┘
 
-                         ASTRONAUT INPUT
-                              │
-                    ┌─────────┼─────────┐
-                    │                   │
-            EXPERIMENT QUERY    VIDEO STREAM + VOICE
-                    │                   │
-                    ▼                   ▼
-        ┌──────────────────┐   ┌────────────────────┐
-        │    KNOWLEDGE     │   │   VISION ENGINE    │
-        │    ASSISTANT     │   └────────────────────┘
-        └──────────────────┘          │
-                │                     ▼
-                │          ┌──────────────────────┐
-                │          │  ACTIVITY RECOGNITION│
-                │          └──────────────────────┘
-                │                     │
-                └────────┬────────────┘
-                         │
-                    CONTEXT FUSION
-                         │
-                    ▼    ▼    ▼
-         ┌──────────────────────────────┐
-         │  EXPERIMENT ENGINE           │
-         │  (Track procedure, state)    │
-         └──────────────────────────────┘
-                         │
-                    ▼    ▼
-         ┌──────────────────────────────┐
-         │  SAFETY ENGINE               │
-         │  (Detect deviations, alerts) │
-         └──────────────────────────────┘
-                         │
-                    ▼    ▼
-         ┌──────────────────────────────┐
-         │  RESPONSE ORCHESTRATOR       │
-         └──────────────────────────────┘
-                         │
-                    ▼    ▼
-         ┌──────────────────────────────┐
-         │  BACKEND API + DATABASE      │
-         └──────────────────────────────┘
-                         │
-                    ▼    ▼
-         ┌──────────────────────────────┐
-         │  FRONTEND DASHBOARD          │
-         │  (Astronaut + Mission Control)│
-         └──────────────────────────────┘
+                     ASTRONAUT / OPERATOR INPUT
+                                │
+                                v
+                  ┌────────────────────────────┐
+                  │  Frontend (Next.js)       │
+                  │  React + TypeScript        │
+                  │  Axios + WebSocket         │
+                  └────────────┬───────────────┘
+                               │
+                               v
+                  ┌────────────────────────────┐
+                  │  FastAPI Backend           │
+                  │  Python application API    │
+                  │  Auth, orchestration       │
+                  └───────┬─────────┬──────────┘
+                          │         │
+                          │         ├──────────────> Vision
+                          │         │                 Ultralytics + YOLO11n
+                          │         │
+                          │         ├──────────────> Activity
+                          │         │                 PyTorch + R3D-18
+                          │         │
+                          │         ├──────────────> Knowledge
+                          │         │                 custom RAG + pgvector
+                          │         │
+                          │         ├──────────────> Experiment
+                          │         │                 Python state machine
+                          │         └──────────────> Safety
+                          │                           deterministic Python rules
+                          v
+                  ┌────────────────────────────┐
+                  │ PostgreSQL + pgvector      │
+                  │ SQLAlchemy + Alembic       │
+                  └────────────────────────────┘
 ```
 
 ## Core Modules
 
-### 1. Vision Engine (`ai/vision/`)
-**Responsibility**: Process video streams and detect objects/personnel.
+### 1. Frontend (`frontend/`)
+**Responsibility**: Display mission data and allow operator interaction.
+
+**Technology**:
+- Next.js
+- React
+- TypeScript
+- Axios for REST calls
+- WebSocket for live data updates
+
+**Key points**:
+- Frontend-only concern.
+- No backend responsibilities are assigned to Next.js API routes.
+- The frontend calls FastAPI endpoints and subscribes to live updates.
+
+---
+
+### 2. Backend API (`backend/`)
+**Responsibility**: Expose the application API and orchestrate internal services.
+
+**Technology**:
+- Python
+- FastAPI
+- Uvicorn
+
+**Responsibilities**:
+- Authentication and authorization
+- Request routing
+- Service orchestration
+- Response shaping
+- Event and audit handling
+- Database persistence access
+
+**Ownership**:
+- Frontend calls FastAPI.
+- FastAPI calls internal Python modules/services.
+
+---
+
+### 3. Vision Engine (`ai/vision/`)
+**Responsibility**: Detect astronauts, equipment, and relevant objects in video frames.
 
 **Inputs**:
-- Video frames (OpenCV Mat or numpy array)
-- Detection configuration (optional region of interest)
+- Video frames
+- Optional ROI and detection settings
 
 **Outputs**:
 - Detected objects with bounding boxes and confidence scores
-- Timestamps
-- Metadata (person ID, equipment type, etc.)
+- Frame timestamps and metadata
 
 **Technology**:
-- YOLOv5/v8 for real-time object detection
-- OpenCV for video processing
+- Ultralytics
+- YOLO11n
+- PyTorch
+- OpenCV
 
-**Key Features**:
-- Astronaut detection and tracking
-- Equipment/container detection
-- Real-time performance (runs locally)
-- Adaptable to different lighting conditions
+**Key features**:
+- Local inference support
+- Real-time object detection
+- Object tracking metadata
 
 ---
 
-### 2. Activity Recognition Engine (`ai/activity_recognition/`)
-**Responsibility**: Classify human activities from video or skeletal data.
+### 4. Activity Recognition Engine (`ai/activity_recognition/`)
+**Responsibility**: Classify astronaut activities from video segments.
 
 **Inputs**:
-- Video frames or skeletal keypoints
-- Context (current experiment)
+- Video frames or sampled clips
+- Current mission context
 
 **Outputs**:
-- Recognized activity with confidence
-- Activity duration
-- Timestamp
-
-**Technology**:
-- Temporal CNN or transformer-based model
-- Pretrained on space/lab activity datasets or adapted general activity models
-
-**Key Features**:
-- Recognizes common astronaut actions (placing samples, adjusting equipment, etc.)
-- Low latency inference
-- Handles partial occlusion
-
----
-
-### 3. Knowledge Assistant (`ai/knowledge_assistant/`)
-**Responsibility**: Answer astronaut questions by retrieving mission/experiment documents.
-
-**Inputs**:
-- Astronaut question (text or transcribed voice)
-- Mission context
-
-**Outputs**:
-- Grounded answer with source documents
+- Predicted activity label
 - Confidence score
-- Suggested follow-up actions
+- Time window metadata
 
 **Technology**:
-- RAG (Retrieval-Augmented Generation)
-- Embeddings model for semantic search
-- PostgreSQL + pgvector for vector storage (within free database stack)
-- LLM for response generation:
-  - **Primary**: Gemini API (free tier)
-  - **Fallback**: Qwen3-4B-Instruct-2507 (local, free)
+- PyTorch
+- Torchvision
+- R3D-18
 
-**Key Features**:
-- Answers only from approved mission/experiment documents
+**Key features**:
+- Temporal video classification
+- Context-aware recognition
+- Consistent contract with backend and experiment engine
+
+---
+
+### 5. Knowledge Assistant (`ai/knowledge_assistant/`)
+**Responsibility**: Answer operational questions grounded in approved mission and experiment documents.
+
+**Inputs**:
+- User question
+- Mission or experiment context
+
+**Outputs**:
+- Grounded answer
 - Source attribution
-- Offline capability
-- Experiment-specific knowledge
+- Confidence score
+
+**Technology**:
+- Custom Python RAG pipeline
+- PostgreSQL + pgvector
+- Embeddings: Sentence Transformers, sentence-transformers/all-MiniLM-L6-v2
+- Gemini API as primary LLM
+- Ollama + Qwen3-4B-Instruct-2507 as local/offline fallback
+- PyMuPDF for PDF extraction
+
+**Important constraints**:
+- Gemini is not described as offline.
+- ChromaDB or other vector databases are not part of the standardized architecture.
 
 ---
 
-### 4. Experiment Engine (`experiment_engine/`)
-**Responsibility**: Track experiment state and procedure progress.
+### 6. Experiment Engine (`experiment_engine/`)
+**Responsibility**: Track procedure state and expected progress across an experiment.
 
-**Inputs**:
-- Experiment definition (SOP document)
-- Activity recognition results
-- Vision results
-- Current experiment state
+**Technology**:
+- Python state machine
 
 **Outputs**:
-- Current procedure step
-- Experiment status (normal, paused, completed)
-- Metadata
+- Current step state
+- Procedure progress
+- Timeline and completion metadata
 
-**Technology**:
-- State machine pattern
-- Deterministic procedure tracking
-- Simple database queries
-
-**Key Features**:
-- Parses experiment SOPs
-- Tracks multi-step procedures
-- Provides procedure context to other modules
+**Key features**:
+- Multi-step SOP tracking
+- Context for downstream safety checks
+- Deterministic progression logic
 
 ---
 
-### 5. Safety Engine (`safety_engine/`)
-**Responsibility**: Detect deviations and safety violations, issue alerts.
-
-**Inputs**:
-- Expected procedure step (from Experiment Engine)
-- Observed activity (from Activity Recognition)
-- Observed objects (from Vision)
-- Safety rules configuration
-
-**Outputs**:
-- Deviation detected (boolean)
-- Severity level (info, warning, critical)
-- Explanation message
-- Recommended action
+### 7. Safety Engine (`safety_engine/`)
+**Responsibility**: Evaluate whether observed actions and conditions match expected safe behavior.
 
 **Technology**:
-- Rule-based logic (deterministic safety rules)
-- No direct LLM control of safety decisions
-- Simple scoring/matching algorithms
+- Deterministic Python rules
+- No LLM dependency
 
-**Key Features**:
-- Expected-vs-observed procedure checking
-- Safety violation detection
-- Severity-based alerting
-- Offline operation
+**Key features**:
+- Procedure-compliance checks
+- Severity-based alerts
+- Human-readable recommendations
+- Explicitly independent from LLM reasoning
 
 ---
 
-### 6. Backend API (`backend/`)
-**Responsibility**: Serve all modules' outputs via REST API, manage authentication, logging, state persistence.
-
-**Inputs**:
-- Requests from frontend
-- Module outputs (vision, activity, experiment state, etc.)
-
-**Outputs**:
-- JSON API responses
-- Mission event logs
-- Audit records
+### 8. Database Layer (`database/`)
+**Responsibility**: Store mission state, experiment data, embeddings, events, and audit records.
 
 **Technology**:
-- FastAPI
-- PostgreSQL for persistent state and audit logs
-- JWT authentication
+- PostgreSQL + pgvector
+- SQLAlchemy
+- Alembic
 
-**Key Features**:
-- Module integration orchestration
-- Request routing
-- Real-time event streaming (WebSocket)
-- Audit logging
-- User authentication and authorization
+**Deployment model**:
+- Local PostgreSQL + pgvector for development
+- Supabase PostgreSQL + pgvector as optional cloud deployment
+
+**Core data groups**:
+- missions
+- experiments
+- events
+- embeddings
+- audit_logs
+- users and roles
 
 ---
 
-### 7. Database Layer (`database/`)
-**Responsibility**: Persistent storage for missions, experiments, audit logs.
+## Testing Strategy
 
-**Technology**:
-- PostgreSQL
-- Simple schema for missions, experiments, astronauts, events, audit logs
+- Backend: Pytest
+- Frontend: Vitest + React Testing Library
+- Contract validation for module interfaces
+- Deterministic safety tests for critical rule behavior
 
-**Key Tables**:
-- `missions` - Mission metadata
-- `experiments` - Experiment definitions and instances
-- `astronauts` - Crew members
-- `events` - Mission timeline (activities, detections, alerts)
+## Deployment
+
+- Docker-based deployment
+- Containerized frontend and backend services
+- PostgreSQL + pgvector as the canonical persistent database
+
+## Standardization Notes
+
+- Replace YOLOv5/v8 wording with Ultralytics + YOLO11n.
+- Replace vague “3D CNN” wording with R3D-18.
+- Remove model-size patterns such as `ACTIVITY_MODEL_SIZE=small`.
+- Use a clear YOLO configuration such as `YOLO_MODEL=YOLO11n`.
+- Keep the frontend and backend architecture distinct: Next.js is frontend only.
+- Keep safety deterministic and independent from any LLM.
+- Document the API ownership relationship explicitly: frontend calls FastAPI; FastAPI orchestrates internal services.
 - `audit_logs` - All system decisions and state changes
 
 ---
@@ -325,15 +344,15 @@ Knowledge Assistant → Backend → Dashboard
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Vision | YOLOv5/v8 | Fast, accurate, well-documented |
-| Activity Recognition | PyTorch + temporal models | Flexible, good for custom datasets |
-| Knowledge Assistant | RAG + Gemini API (primary) + Qwen3-4B (fallback) + PostgreSQL + pgvector | Free tier, offline capable, grounded |
+| Vision | Ultralytics + YOLO11n + PyTorch + OpenCV | Standardized, fast, modern object detection |
+| Activity Recognition | PyTorch + Torchvision + R3D-18 | Temporal video classification for operational actions |
+| Knowledge Assistant | Custom Python RAG + PostgreSQL + pgvector + Gemini API + Ollama fallback | Grounded, traceable answers with optional local fallback |
 | Experiment Tracking | Python state machine | Deterministic, auditable |
-| Safety Logic | Rule-based Python | No AI in safety-critical paths |
-| Backend | FastAPI + PostgreSQL (Supabase free tier) | Simple, fast, easy to test |
-| Frontend | Next.js + WebSocket | Modern React framework with SSR, real-time updates |
-| Vector Storage | PostgreSQL + pgvector | Integrated with free database stack |
-| Deployment | Docker containers | Easy to replicate, version control |
+| Safety Logic | Deterministic Python rules | No LLM dependency in safety-critical paths |
+| Backend | Python + FastAPI + Uvicorn | Modern async API backend |
+| Frontend | Next.js + React + TypeScript + Axios + WebSocket | Modern client UI with real-time updates |
+| Vector Storage | PostgreSQL + pgvector | Standard database layer for embeddings and retrieval |
+| Deployment | Docker containers | Reproducible and portable |
 
 ---
 

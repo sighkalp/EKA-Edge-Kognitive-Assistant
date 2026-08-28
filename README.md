@@ -1,223 +1,240 @@
 # EKA — Evolving Kognitive Assistant
 
-An AI-powered mission support system for astronauts conducting experiments in space-station and ground-based environments.
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
 
-**Status**: Architecture and documentation complete. Development ready for implementation.
+EKA is an AI-powered mission support system for astronauts conducting experiments in space-station and ground-based environments.
 
 ---
 
 ## Overview
 
-EKA is a comprehensive AI assistant that:
+EKA combines computer vision, activity understanding, procedural tracking, safety compliance, and knowledge-assisted decision support.
 
-- 📹 **Detects objects** in video (Vision Engine)
-- 🧑‍🚀 **Recognizes activities** from video (Activity Recognition)
-- 📋 **Tracks procedures** step-by-step (Experiment Engine)
-- 🚨 **Detects safety violations** in real-time (Safety Engine)
-- 💡 **Answers questions** from mission documents (Knowledge Assistant)
-- 📊 **Aggregates and displays** mission state (Backend + Frontend)
-- 🔐 **Maintains complete audit trail** for accountability
+Core capabilities:
+- Vision detection for astronauts and equipment
+- Human activity recognition from video
+- Experiment procedure tracking with a Python state machine
+- Deterministic safety checks based on rules
+- Grounded Q&A from approved mission documents
+- Real-time mission state aggregation for the frontend
+- Persistent mission and audit data in PostgreSQL + pgvector
 
-**Designed by**: 6-member student team (B.Tech CSE/AI-ML, 2nd/3rd year)  
-**Timeline**: 9 weeks  
-**Philosophy**: Realistic, modular, production-style student project
+**System ownership model**
+- Frontend: Next.js + React + TypeScript
+- Backend: Python + FastAPI + Uvicorn
+- Internal services/modules: Python services invoked by FastAPI
+- Database: PostgreSQL + pgvector with SQLAlchemy + Alembic
+- Deployment: Docker
 
 ---
 
-## Quick Start
+## Architecture Summary
 
-### Prerequisites
-- Python 3.9+
-- PostgreSQL 12+
-- NVIDIA GPU (recommended, CPU fallback available)
-- Git
+EKA follows a clear ownership flow:
 
-### Setup (Development)
+Frontend -> FastAPI -> Internal module services and persistence layer
 
-```bash
-# Clone repository
-git clone <repo-url>
-cd EKA
+- The frontend is a Next.js React TypeScript client that calls the backend via Axios and receives live updates via WebSocket.
+- FastAPI is the application backend and API entry point.
+- FastAPI orchestrates internal Python services for vision, activity recognition, knowledge retrieval, experiment state, and safety checks.
+- PostgreSQL + pgvector stores mission metadata, experiment state, embeddings, and audit records.
+- The frontend does not own or implement backend logic; it is not the application backend.
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or: venv\Scripts\activate (Windows)
+---
 
-# Install dependencies
-pip install -r requirements-dev.txt
+## Standardized Stack
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
+| Layer | Technology |
+|------|------------|
+| Frontend | Next.js, React, TypeScript |
+| API client | Axios |
+| Real-time updates | WebSocket |
+| Backend | Python, FastAPI, Uvicorn |
+| Database | PostgreSQL + pgvector |
+| ORM/Migrations | SQLAlchemy, Alembic |
+| Local development database | Local PostgreSQL + pgvector |
+| Optional cloud deployment database | Supabase PostgreSQL + pgvector |
+| Vision | Ultralytics, YOLO11n, PyTorch, OpenCV |
+| Activity recognition | PyTorch, Torchvision, R3D-18 |
+| Embeddings | Sentence Transformers, sentence-transformers/all-MiniLM-L6-v2 |
+| Knowledge assistant | Custom Python RAG pipeline |
+| LLM primary | Gemini API |
+| LLM fallback | Ollama + Qwen3-4B-Instruct-2507 |
+| PDF extraction | PyMuPDF |
+| Experiment engine | Python state machine |
+| Safety engine | Deterministic Python rules |
+| Testing | Pytest, Vitest, React Testing Library |
+| Deployment | Docker |
 
-# Setup database
-python -m alembic upgrade head
+---
 
-# Run tests
-pytest tests/
+## System Flow
 
-# Start backend server
-python backend/main.py
-
-# In another terminal, start frontend
-cd frontend
-npm install
-npm start
+```text
+Frontend (Next.js + React + TypeScript)
+        |
+        | Axios requests + WebSocket streams
+        v
+FastAPI (Python API backend)
+        |
+        +--> Vision Service (Ultralytics + YOLO11n)
+        +--> Activity Service (PyTorch + R3D-18)
+        +--> Knowledge Service (custom Python RAG + pgvector)
+        +--> Experiment Engine (Python state machine)
+        +--> Safety Engine (deterministic Python rules)
+        |
+        v
+PostgreSQL + pgvector (SQLAlchemy/Alembic)
 ```
 
-### Try the Demo Scenario
+The safety layer must remain LLM-independent and deterministic.
 
-See `docs/DEMO_SCENARIO.md` for complete crystal growth experiment walkthrough.
+---
 
-```bash
-# Load demo data
-python scripts/load_demo_scenario.py
+## Project Structure
 
-# Visit dashboard
-open http://localhost:3000/demo
+```text
+EKA/
+├── README.md
+├── .env.example
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── API_CONTRACTS.md
+│   ├── PROJECT_REQUIREMENTS.md
+│   ├── SECURITY.md
+│   └── DEMO_SCENARIO.md
+├── backend/
+│   └── README.md
+├── frontend/
+│   └── README.md
+├── database/
+│   └── README.md
+├── ai/
+│   ├── vision/
+│   │   └── README.md
+│   ├── activity_recognition/
+│   │   └── README.md
+│   └── knowledge_assistant/
+│       └── README.md
+├── experiment_engine/
+│   └── README.md
+├── safety_engine/
+│   └── README.md
+└── docker/
+    └── (deployment assets, if added later)
 ```
-
----
-
-## Architecture
-
-EKA is organized into 7 core modules:
-
-```
-┌──────────────────────────────────────────┐
-│          FRONTEND DASHBOARD              │
-│        (Next.js, Real-time UI)           │
-└────────────────────┬─────────────────────┘
-                     │
-        ┌────────────▼─────────────┐
-        │    BACKEND API           │
-        │   (FastAPI, REST)        │
-        │   (Authentication)       │
-        │   (Audit Logging)        │
-        └────┬───────────┬─────────┘
-             │           │
-      ┌──────▼──────┐    └──────┬──────────┐
-      │   AI MODULES │           │ DATABASE │
-      │              │           └──────────┘
-      ├─ Vision      │
-      ├─ Activity    │
-      │  Recognition │
-      ├─ Knowledge   │
-      │  Assistant   │
-      └──────┬───────┘
-             │
-      ┌──────▼────────────────┐
-      │ Experiment Engine     │
-      │ Safety Engine         │
-      └──────────────────────┘
-```
-
-**Detailed Architecture**: See `docs/ARCHITECTURE.md`
-
----
-
-## Module Ownership
-
-| Module | Owner | Language | Focus |
-|--------|-------|----------|-------|
-| Vision Engine | Member 2 | Python | Object detection (YOLO) |
-| Activity Recognition | Member 1 | Python | Action classification (PyTorch) |
-| Knowledge Assistant | Member 3 | Python | Q&A from documents (RAG) |
-| Experiment Engine | Member 4 | Python | Procedure tracking (State Machine) |
-| Safety Engine | Member 4 | Python | Violation detection (Rules) |
-| Backend + Database | Member 5 | Python | API, Auth, Logging (FastAPI) |
-| Frontend + Integration | Member 6 | TypeScript/Next.js | Dashboard, UX |
-
----
-
-## Key Features
-
-### 1. Real-Time Vision
-- Astronaut and equipment detection
-- Bounding boxes and confidence scores
-- <100ms inference latency
-
-### 2. Activity Understanding
-- 13+ recognized activities
-- Context-aware classification
-- Works with partial occlusion
-
-### 3. Procedure Tracking
-- Multi-step experiment SOPs
-- Progress visualization
-- Timeline recording
-
-### 4. Safety Vigilance
-- Expected-vs-observed checking
-- Deterministic rules (no AI in safety path)
-- Severity-based alerting
-
-### 5. Mission Knowledge
-- Grounded Q&A from approved documents
-- Source attribution
-- Offline capability
-
-### 6. Comprehensive Audit
-- All decisions logged
-- Tamper-detected audit trail
-- Mission review support
-
----
-
-## Technology Stack
-
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| Vision | YOLOv5/v8 | Real-time, production-ready |
-| Activity | PyTorch + 3D CNN | Flexible temporal modeling |
-| Knowledge | RAG + Gemini API (primary) + Qwen3-4B (fallback) + pgvector | Free tier, offline capable, grounded |
-| Experiment | Python state machine | Deterministic, auditable |
-| Safety | Rule-based Python | No AI, explainable |
-| Backend | FastAPI + PostgreSQL (Supabase) | Fast, async, reliable |
-| Frontend | Next.js + WebSocket | Real-time React framework with API routes |
-| Vector Store | PostgreSQL + pgvector | Integrated with free database stack |
-| Deployment | Docker | Reproducible, portable |
-
----
-
-## Documentation
-
-Start here:
-
-1. **`README.md`** (this file) — Project overview
-2. **`docs/ARCHITECTURE.md`** — System design and data flow
-3. **`docs/API_CONTRACTS.md`** — Module interfaces (JSON schemas)
-4. **`docs/PROJECT_REQUIREMENTS.md`** — Functional and non-functional requirements
-5. **`docs/SECURITY.md`** — Authentication, encryption, audit logging
-6. **`docs/DEMO_SCENARIO.md`** — Complete walkthrough of crystal growth experiment
-
-Module-specific documentation:
-
-- **`ai/vision/README.md`** — Vision engine setup and usage
-- **`ai/activity_recognition/README.md`** — Activity recognition model
-- **`ai/knowledge_assistant/README.md`** — Knowledge base and Q&A
-- **`experiment_engine/README.md`** — Procedure tracking
-- **`safety_engine/README.md`** — Safety rules and violation detection
-- **`backend/README.md`** — API server and database
-- **`frontend/README.md`** — Dashboard UI
 
 ---
 
 ## Development Workflow
 
-### 1. Understand the Architecture
-
-Read `docs/ARCHITECTURE.md` and the module READMEs.
-
-### 2. Work on Your Module
+### 1. Local setup
 
 ```bash
-# Create feature branch
-git checkout -b feature/your-feature
+# clone repo
+git clone <repo-url>
+cd EKA
 
-# Install module dependencies
-cd <your-module>
-pip install -r requirements.txt
+# create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# install Python dependencies
+pip install -r requirements-dev.txt
+
+# configure environment
+cp .env.example .env
+```
+
+### 2. Start database
+
+Use local PostgreSQL + pgvector for development.
+
+```bash
+createdb eka_db
+```
+
+### 3. Run backend
+
+```bash
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 4. Run frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Development frontend URL:
+- http://localhost:3000
+
+### 5. Production build
+
+```bash
+cd frontend
+npm run build
+npm start
+```
+
+---
+
+## Documentation Index
+
+- `README.md` — repository overview and architecture standard
+- `docs/ARCHITECTURE.md` — system design and module interactions
+- `docs/API_CONTRACTS.md` — JSON contracts and ownership boundaries
+- `docs/PROJECT_REQUIREMENTS.md` — product/design requirements
+- `docs/SECURITY.md` — security and audit expectations
+- `docs/DEMO_SCENARIO.md` — example mission flow
+
+Module documentation:
+- `backend/README.md` — API backend and orchestration
+- `frontend/README.md` — user-facing dashboard and client behavior
+- `database/README.md` — PostgreSQL + pgvector schema and migrations
+- `ai/vision/README.md` — object detection with YOLO11n
+- `ai/activity_recognition/README.md` — activity classification with R3D-18
+- `ai/knowledge_assistant/README.md` — knowledge retrieval and grounding
+- `experiment_engine/README.md` — procedure state tracking
+- `safety_engine/README.md` — deterministic safety rules
+
+---
+
+## Testing
+
+- Python tests: Pytest
+- Frontend tests: Vitest + React Testing Library
+
+Example commands:
+
+```bash
+pytest
+cd frontend && npm test
+```
+
+---
+
+## Deployment
+
+EKA is deployed with Docker containers.
+
+- Frontend is served as a Next.js app container.
+- Backend runs as a FastAPI/Uvicorn container.
+- PostgreSQL + pgvector is the primary data layer for local and cloud deployments.
+- Supabase PostgreSQL + pgvector is optional for cloud hosting.
+
+---
+
+## Notes
+
+- Next.js is frontend-only; it does not replace the Python FastAPI backend.
+- Gemini API is the primary LLM for knowledge generation; it is not an offline component.
+- Ollama + Qwen3-4B-Instruct-2507 is the local/offline fallback.
+- The safety engine is rule-based and must not depend on an LLM.
+- No implementation code is being added in this documentation-only standardization pass.
 
 # Develop and test
 pytest tests/
@@ -310,8 +327,12 @@ pytest tests/performance/ --benchmark
 
 ### Development
 ```bash
-python backend/main.py
-npm start  # (in frontend/)
+# backend
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# frontend
+cd frontend
+npm run dev
 ```
 
 ### Staging (Docker)
@@ -345,9 +366,9 @@ psql -U postgres -d eka_db
 
 ### GPU out of memory
 ```bash
-# Use smaller models
-YOLO_MODEL_PATH=models/weights/yolo5s.pt
-ACTIVITY_MODEL_SIZE=small
+# Use smaller operating settings or reduce input size
+YOLO_MODEL=YOLO11n
+ACTIVITY_MODEL=R3D-18
 ```
 
 ### Slow inference
@@ -484,8 +505,8 @@ Built by a dedicated team of student engineers with guidance from mentors. This 
 
 ---
 
-**Project Version**: 1.0 (Architecture)  
-**Last Updated**: 2024-01-15  
-**Next Milestone**: Core module implementations complete by Week 6
+**Project Version**: 1.1 (Architecture Standardized)  
+**Last Updated**: 2026-08-29  
+**Next Milestone**: Core module implementation planning and documentation alignment
 
 **Let's build something extraordinary! 🚀**

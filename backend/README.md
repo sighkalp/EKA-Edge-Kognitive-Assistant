@@ -1,108 +1,134 @@
-# Backend API & Database
+﻿# Backend API
 
-**Responsibility**: Serve API endpoints, manage authentication, coordinate modules, persist data, and maintain audit logs.
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
+**Responsibility**: Expose the application API, orchestrate internal services, and manage data access.
 
 ---
 
 ## Overview
 
-The Backend is the central hub of EKA. It:
+The FastAPI backend is the system boundary for the repository. It is the only application backend. The frontend is a separate Next.js application, and it will call FastAPI APIs over HTTP and WebSocket.
 
-- Exposes REST API endpoints for all modules
-- Handles user authentication and authorization
-- Coordinates between AI modules
-- Manages PostgreSQL database
-- Maintains comprehensive audit logs
-- Streams real-time updates via WebSocket
+Responsibilities:
+- Expose REST endpoints for frontend clients
+- Coordinate internal Python services
+- Persist mission, experiment, and audit data
+- Authenticate and authorize users
+- Stream mission updates through WebSocket
+- Standardize responses and error handling
 
-**Owner**: Member 5  
-**Framework**: FastAPI  
-**Database**: PostgreSQL  
-**Authentication**: JWT  
+**Stack**:
+- Python
+- FastAPI
+- Uvicorn
+- PostgreSQL + pgvector
+- SQLAlchemy
+- Alembic
 
 ---
 
-## Installation
+## Ownership Model
 
-```bash
-pip install -r backend/requirements.txt
-python backend/main.py
+```text
+Frontend (Next.js + React + TypeScript)
+        |
+        | Axios + WebSocket
+        v
+FastAPI backend
+        |
+        +--> internal service layer (vision, activity recognition, knowledge, experiment, safety)
+        +--> database layer (PostgreSQL + pgvector)
 ```
 
-Server runs at `http://localhost:8000`
+This is explicit: frontend -> FastAPI; FastAPI -> internal modules/services.
 
 ---
 
-## API Endpoints
+## Development Environment
 
-All endpoints require JWT token in `Authorization: Bearer <token>` header.
+```bash
+# Create environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements-dev.txt
+
+# Start backend locally
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Local API endpoint:
+- http://localhost:8000
+
+---
+
+## Database Standards
+
+- Local PostgreSQL + pgvector for development
+- Optional Supabase PostgreSQL + pgvector for cloud deployment
+- SQLAlchemy for ORM access
+- Alembic for schema migrations
+
+---
+
+## API Surface
+
+Common design rules:
+- The frontend is the client.
+- FastAPI is the application backend.
+- Internal modules are not called directly by the frontend.
+- Safety checks remain deterministic and do not depend on an LLM.
 
 ### Authentication
-- `POST /api/auth/login` — Login user
-- `POST /api/auth/logout` — Logout user
-- `POST /api/auth/refresh` — Refresh token
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
 
 ### Vision
-- `POST /api/vision/detect` — Detect objects in frame
+- `POST /api/vision/detect`
 
 ### Activity
-- `POST /api/activity/recognize` — Recognize activity
+- `POST /api/activity/recognize`
 
 ### Experiment
-- `GET /api/experiment/{id}/state` — Get experiment state
-- `POST /api/experiment/start` — Start experiment
-- `POST /api/experiment/{id}/advance` — Advance step
+- `GET /api/experiment/{id}/state`
+- `POST /api/experiment/start`
+- `POST /api/experiment/{id}/advance`
 
 ### Safety
-- `POST /api/safety/check` — Check safety compliance
+- `POST /api/safety/check`
 
 ### Knowledge
-- `POST /api/knowledge/query` — Query knowledge base
+- `POST /api/knowledge/query`
 
 ### Mission
-- `GET /api/mission/{id}/state` — Get mission state
-- `GET /api/mission/{id}/events` — Get event timeline
+- `GET /api/mission/{id}/state`
+- `GET /api/mission/{id}/events`
 
 ### Audit
-- `GET /api/audit/logs` — Query audit logs
+- `GET /api/audit/logs`
 
 ---
 
-## Database Schema
+## Persistence
 
-See `docs/ARCHITECTURE.md` for ER diagram.
-
-**Main Tables**:
-- `users` — Astronauts and mission control
-- `missions` — Mission metadata
-- `experiments` — Experiment instances
-- `events` — Mission timeline events
-- `audit_logs` — Immutable decision logs
-
----
-
-## Development
-
-```bash
-# Create migrations
-alembic revision --autogenerate -m "Add new table"
-
-# Run migrations
-alembic upgrade head
-
-# Seed test data
-python backend/scripts/seed_demo_data.py
-```
+Recommended storage model:
+- `missions` — mission metadata and configuration
+- `experiments` — experiment instances and progression
+- `events` — timer/mission timeline data
+- `embeddings` — vector storage for RAG retrieval
+- `audit_logs` — operational and security records
+- `users` — astronauts/operators/access control metadata
 
 ---
 
 ## Testing
 
 ```bash
-pytest backend/tests/
-
-# With coverage
-pytest backend/tests/ --cov=backend
+pytest
 ```
 
 ---
@@ -111,11 +137,17 @@ pytest backend/tests/ --cov=backend
 
 ```bash
 docker build -t eka-backend .
-docker run -p 8000:8000 -e DATABASE_URL=postgres://... eka-backend
+docker run -p 8000:8000 eka-backend
 ```
+
+The backend is part of a Docker-based deployment architecture alongside the Next.js frontend and PostgreSQL + pgvector.
 
 ---
 
-**For detailed setup**: See `backend/README.md` after implementation
+## Standardization Notes
 
-**Status**: Ready for implementation
+- Next.js is frontend-only.
+- FastAPI is the only backend.
+- Gemini is the primary LLM, not an offline system.
+- Ollama + Qwen3-4B-Instruct-2507 is the local fallback.
+- Safety logic remains deterministic and LLM-independent.
