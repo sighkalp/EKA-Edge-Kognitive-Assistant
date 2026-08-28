@@ -86,7 +86,7 @@ EKA is organized into 7 core modules:
 ```
 ┌──────────────────────────────────────────┐
 │          FRONTEND DASHBOARD              │
-│         (React, Real-time UI)            │
+│        (Next.js, Real-time UI)           │
 └────────────────────┬─────────────────────┘
                      │
         ┌────────────▼─────────────┐
@@ -126,7 +126,7 @@ EKA is organized into 7 core modules:
 | Experiment Engine | Member 4 | Python | Procedure tracking (State Machine) |
 | Safety Engine | Member 4 | Python | Violation detection (Rules) |
 | Backend + Database | Member 5 | Python | API, Auth, Logging (FastAPI) |
-| Frontend + Integration | Member 6 | TypeScript/React | Dashboard, UX |
+| Frontend + Integration | Member 6 | TypeScript/Next.js | Dashboard, UX |
 
 ---
 
@@ -174,7 +174,7 @@ EKA is organized into 7 core modules:
 | Experiment | Python state machine | Deterministic, auditable |
 | Safety | Rule-based Python | No AI, explainable |
 | Backend | FastAPI + PostgreSQL (Supabase) | Fast, async, reliable |
-| Frontend | React + WebSocket | Responsive, real-time |
+| Frontend | Next.js + WebSocket | Real-time React framework with API routes |
 | Vector Store | PostgreSQL + pgvector | Integrated with free database stack |
 | Deployment | Docker | Reproducible, portable |
 

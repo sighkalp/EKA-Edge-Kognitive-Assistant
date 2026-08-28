@@ -253,7 +253,7 @@ EKA (Evolving Kognitive Assistant) is an AI-powered assistant designed to suppor
 - User input (questions, commands)
 
 **Technology**:
-- React or similar modern frontend framework
+- Next.js for SSR/SSG and full-stack React framework
 - WebSocket for real-time updates
 
 **Key Features**:
@@ -331,7 +331,7 @@ Knowledge Assistant → Backend → Dashboard
 | Experiment Tracking | Python state machine | Deterministic, auditable |
 | Safety Logic | Rule-based Python | No AI in safety-critical paths |
 | Backend | FastAPI + PostgreSQL (Supabase free tier) | Simple, fast, easy to test |
-| Frontend | React | Modern, reactive, widely known |
+| Frontend | Next.js + WebSocket | Modern React framework with SSR, real-time updates |
 | Vector Storage | PostgreSQL + pgvector | Integrated with free database stack |
 | Deployment | Docker containers | Easy to replicate, version control |
 
