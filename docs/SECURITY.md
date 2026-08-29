@@ -1,4 +1,4 @@
-# EKA Security Design
+# E.K.A Security Design
 
 This document outlines the security architecture and principles for the EKA system.
 
