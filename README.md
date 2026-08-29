@@ -1,4 +1,4 @@
-# EKA — Evolving Kognitive Assistant
+# E.K.A — Evolving Kognitive Assistant
 
 Architecture Version: 1.1 — Architecture Standardized
 Last Updated: 2026-08-29
