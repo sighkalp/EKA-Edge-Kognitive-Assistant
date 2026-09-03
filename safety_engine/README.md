@@ -1,58 +1,40 @@
 # Safety Engine
 
-**Responsibility**: Detect procedure deviations and safety violations in real-time.
+Architecture Version: 1.1 — Architecture Standardized
+Last Updated: 2026-08-29
+
+**Responsibility**: Detect deviations from expected safe behavior using deterministic Python rules.
 
 ---
 
 ## Overview
 
-The Safety Engine is a deterministic rule-based system that protects mission integrity. It compares expected vs. observed activities and equipment states, detects safety violations, and issues severity-appropriate alerts. **No AI inference is used for safety-critical decisions.**
+The safety engine compares the current expected procedure state to observed activity and object state. It raises warnings or critical alerts when operations fall outside expected safe behavior.
 
-**Owner**: Member 4  
-**Dependencies**: Experiment Engine, Vision Engine, Activity Recognition  
-**Technology**: Rule-based Python engine, deterministic logic
+**Critical requirement**:
+- Safety decisions must be deterministic.
+- Safety logic must not depend on an LLM.
+
+**Technology**:
+- deterministic Python rules
+- explicit rule evaluation in code and configuration
 
 ---
 
 ## Inputs
 
-### Expected State (from Experiment Engine)
-- Current step
-- Expected activities
-- Required equipment
-
-### Observed State (from Activity Recognition & Vision)
-- Recognized activity
-- Detected objects
-
-### Safety Rules (Configuration)
-- Rule definitions in YAML/JSON format
-
----
+- expected step state from the experiment engine
+- observed activity from the activity recognition service
+- observed objects from the vision service
+- configured safety rules
 
 ## Outputs
 
-See `docs/API_CONTRACTS.md` for detailed JSON schema.
-
-**Example Output (Normal)**:
 ```json
 {
-  "deviation_detected": false,
-  "alerts": [],
-  "warnings": [],
-  "procedure_compliance": {
-    "expected_activity": "securing_chamber",
-    "observed_activity": "securing_chamber",
-    "match_confidence": 0.94
-  },
-  "status": "success"
-}
-```
-
-**Example Output (Deviation)**:
-```json
-{
+  "timestamp": 1629907200.789,
   "deviation_detected": true,
+  "check_type": "procedure_compliance",
   "alerts": [
     {
       "severity": "critical",
@@ -64,412 +46,148 @@ See `docs/API_CONTRACTS.md` for detailed JSON schema.
       "rule": "SOP-2.3.1"
     }
   ],
+  "warnings": [],
   "status": "success"
 }
 ```
 
 ---
 
+## Rule Model
+
+The safety logic is implemented as explicit deterministic rules, for example:
+- chamber seal checks
+- temperature thresholds
+- equipment state validation
+- procedure sequencing
+- emergency-stop triggers
+
+These rules are evaluated in code and configuration, not via a generative model.
+
+### Example rule definition
+
+```yaml
+rules:
+  - id: "RULE_CHAMBER_SEAL_001"
+    title: "Chamber must be sealed before reaction"
+    severity: "critical"
+    condition: "current_step == 6 and observed_state.chamber_sealed == false"
+    recommendation: "STOP. Seal chamber before continuing."
+    reference: "SOP-2.3.1"
+```
+
+---
+
 ## Installation
 
-1. **Install dependencies**
-   ```bash
-   pip install -r safety_engine/requirements.txt
-   ```
-
-2. **Load safety rules**
-   ```bash
-   python safety_engine/load_rules.py \
-     --rules safety_engine/rules/ \
-     --database postgres://localhost:5432/eka_db
-   ```
-
-3. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Set ENABLE_SAFETY_ENGINE=true
-   ```
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r safety_engine/requirements.txt
+```
 
 ---
 
 ## Usage
 
-### As a Module
+### Python usage
 
 ```python
 from safety_engine import SafetyEngine
 
-# Initialize
-engine = SafetyEngine(
-    rules_path="safety_engine/rules/",
-    database_url="postgresql://..."
-)
-
-# Check safety
+engine = SafetyEngine(rules_path="safety_engine/rules/")
 result = engine.check_safety(
-    expected_activity="securing_chamber",
-    observed_activity="placing_sample",
-    expected_equipment=["chamber", "bolts"],
-    observed_equipment=["chamber", "bolts", "beaker"]
+    expected={"current_step": 6, "expected_activity": "securing_chamber"},
+    observed={"current_activity": "initializing_reaction", "chamber_sealed": False}
 )
 
 print(result)
-# {
-#   "deviation_detected": True,
-#   "alerts": [{
-#       "severity": "warning",
-#       "message": "Expected: securing_chamber, Observed: placing_sample"
-#   }]
-# }
 ```
 
-### As a Service (via Backend API)
+### Backend API usage
 
 ```bash
 curl -X POST http://localhost:8000/api/safety/check \
-  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "expected": {...},
-    "observed": {...}
+    "expected": {"current_step": 6, "expected_activity": "securing_chamber"},
+    "observed": {"current_activity": "initializing_reaction", "chamber_sealed": false}
   }'
 ```
 
 ---
 
-## Safety Rules
+## Role in EKA
 
-### Rule Definition Format
-
-```yaml
-# safety_engine/rules/chamber_integrity.yaml
-rules:
-  - id: "RULE_CHAMBER_SEAL_001"
-    title: "Chamber must be sealed before reaction"
-    severity: "critical"
-    condition: |
-      current_step == 6 AND
-      observed_state.chamber_sealed == False AND
-      observed_activity == "initializing_reaction"
-    recommendation: "STOP. Seal chamber with cap and tighten bolts."
-    reference: "SOP-2.3.1"
-    
-  - id: "RULE_TEMP_LIMIT_001"
-    title: "Reaction temperature must not exceed 60°C"
-    severity: "warning"
-    condition: |
-      observed_state.temperature > 60.0
-    recommendation: "Reduce heat source or increase coolant flow."
-    reference: "SAFETY-HANDBOOK-4.2"
-```
-
-### Built-in Rules
-
-- Chamber integrity (seal, pressure)
-- Temperature limits
-- Equipment operational checks
-- Procedure sequence validation
-- Emergency stop triggers
-
-### Adding Custom Rules
-
-```yaml
-# Create new rule file
-safety_engine/rules/custom_experiment.yaml
-
-# Load rules
-python safety_engine/load_rules.py --rules safety_engine/rules/
-```
+- The safety engine receives procedure context from the experiment engine.
+- It evaluates observed mission state from the activity and vision services.
+- It returns alerts to the backend, which can forward them to the frontend.
+- Safety decisions remain explainable, auditable, and independent from LLM outputs.
 
 ---
 
-## Configuration
+## Safety Principles
 
-### Severity Levels
+### 1. Deterministic
+- the same inputs yield the same output
+- no AI or probabilistic interpretation is used for safety-critical decisions
 
-```python
-class SeverityLevel(Enum):
-    INFO = "info"           # Informational, no action required
-    WARNING = "warning"     # Minor deviation, monitor
-    CRITICAL = "critical"   # Safety violation, immediate action
-```
+### 2. Fail safe
+- default to stop or alert when the observed state is uncertain or contradictory
 
-### Alert Categories
-
-```python
-CATEGORIES = [
-    "safety",          # Safety protocol violation
-    "procedure",       # Procedural step mismatch
-    "equipment",       # Equipment malfunction
-    "timeline",        # Timing issue (behind schedule)
-    "environmental"    # Environmental violation (temp, pressure)
-]
-```
-
----
-
-## Testing
-
-### Unit Tests
-
-```bash
-pytest safety_engine/tests/
-
-# With coverage
-pytest safety_engine/tests/ --cov=safety_engine
-```
-
-### Test Cases
-
-1. **test_normal_compliance**: No deviation on normal execution
-2. **test_chamber_seal_violation**: Detect unsealed chamber
-3. **test_temperature_violation**: Detect overheating
-4. **test_activity_mismatch**: Detect activity deviation
-5. **test_missing_equipment**: Detect missing required equipment
-6. **test_alert_severity**: Correct severity for each violation
-7. **test_api_contract**: JSON output schema validation
-8. **test_latency**: <50ms per check
-
-### Test Data
-
-```
-data/test/safety/
-├── test_scenarios.yaml
-├── normal_execution.json
-├── deviation_cases/
-│   ├── unsealed_chamber.json
-│   ├── overheating.json
-│   └── wrong_activity.json
-└── expected_alerts.json
-```
-
----
-
-## Architecture
-
-### Safety Check Flow
-
-```
-Expected State (from Experiment Engine)
-    ↓
-Safety Rules Loaded
-    ↓
-Observed State (from Activity + Vision)
-    ↓
-Rule Evaluation (deterministic)
-    ↓
-Violations Detected?
-    ├─ Yes → Generate Alerts (severity-based)
-    └─ No → Return "all clear"
-    ↓
-Return Result with Recommendations
-    ↓
-Backend Logs Alert
-    ↓
-Frontend Displays Alert
-```
-
-### Rule Engine
-
-```python
-class SafetyEngine:
-    def __init__(self, rules_path: str, database_url: str)
-    
-    def load_rules(self) -> None
-    def check_safety(self, expected: dict, observed: dict) -> dict
-    def evaluate_rule(self, rule: dict, state: dict) -> bool
-    def get_violations(self, state: dict) -> List[dict]
-    def get_recommendations(self, violations: List[dict]) -> List[str]
-```
-
----
-
-## Key Principles
-
-### 1. Deterministic (No AI)
-- All decisions based on explicit rules
-- Reproducible and auditable
-- No neural networks in safety path
-
-```python
-# ✓ GOOD: Deterministic rule
-if observed_chamber_sealed == False and observed_activity == "initializing":
-    raise SafetyViolation("Chamber not sealed")
-
-# ✗ BAD: AI-based decision
-if ml_model.predict(state) == "unsafe":
-    raise SafetyViolation("AI says unsafe")
-```
-
-### 2. Fail Safe
-- Default to "stop" on uncertainty
-- Conservative approach
-- Astronaut can override with authorization
-
-```python
-if confidence < THRESHOLD:
-    return {
-        "safe": False,
-        "recommendation": "STOP - unclear state"
-    }
-```
-
-### 3. Complete Audit Trail
-- Every safety decision is logged
-- Includes rule ID, inputs, outputs, timestamp
-
-```python
-audit_log(
-    event="safety_check",
-    rule_id=rule.id,
-    expected=expected,
-    observed=observed,
-    violation=violation,
-    timestamp=now()
-)
-```
+### 3. Auditable
+- each alert should include rule metadata, expected state, observed state, and recommendation
 
 ---
 
 ## Integration with Other Modules
 
 ### With Experiment Engine
-
-```
-Experiment Engine provides:
-  - current_step
-  - expected_activities
-  - required_equipment
-
-Safety Engine checks:
-  - Are observed activities expected?
-  - Is required equipment present?
-```
+- expected state and procedure step come from the experiment engine
 
 ### With Activity Recognition + Vision
-
-```
-Activity Recognition → "observed: placing_sample"
-Vision → "observed objects: [sample, beaker]"
-             ↓
-Safety Engine → Compare with expected
-             ↓
-Rule evaluation
-```
+- observed state comes from activity and object detection outputs
 
 ### With Backend API
-
-```python
-# backend/routers/safety.py
-@router.post("/api/safety/check")
-async def check_safety(
-    request: SafetyCheckRequest,
-    token: str = Depends(oauth2_scheme)
-):
-    result = safety_engine.check_safety(
-        expected=request.expected,
-        observed=request.observed
-    )
-    
-    # Log for audit
-    audit_log(token.user_id, "safety.check", request, result)
-    
-    # Alert if violation
-    if result["deviation_detected"]:
-        send_alert_to_dashboard(result)
-    
-    return result
-```
+- FastAPI exposes the safety evaluation endpoint for operational monitoring and frontend alerts
 
 ---
 
-## Performance
+## Testing
 
-- Rule evaluation: <50ms per check
-- Database query: <10ms
-- Total latency: <100ms
-
-Target: Real-time safety decisions without blocking main loop
+- Pytest for rule evaluation
+- deterministic alert validation
+- safety regression tests across critical conditions
+- checks that LLMs are not required for safety decisions
 
 ---
 
 ## Troubleshooting
 
-### Rules not loading
-```bash
-python safety_engine/load_rules.py --rules safety_engine/rules/ --verbose
-```
-
 ### False positives
-- Review rule conditions
-- Adjust confidence thresholds
-- Add context-aware rules
+- verify expected activity and observed state alignment
+- review rule thresholds and condition ordering
+- ensure the current experiment phase is correctly set
 
-### Slow rule evaluation
-```python
-# Cache rule conditions
-engine = SafetyEngine(cache_rules=True)
-```
+### Rules not loading
+- verify the configured rule files are present
+- check YAML/JSON format and schema validity
 
 ---
 
 ## Dependencies
 
-See `safety_engine/requirements.txt`:
-```
-pydantic==2.5.0
-pyyaml==6.0.1
-sqlalchemy==2.0.23
-```
+Core rule evaluation should remain in pure Python and should not require an LLM runtime. Dependencies are limited to the standard backend runtime and any configuration parser needed for rule definitions.
 
 ---
 
-## Database
+## Acceptance Criteria
 
-```sql
-CREATE TABLE safety_rules (
-    id SERIAL PRIMARY KEY,
-    rule_id VARCHAR(64) NOT NULL UNIQUE,
-    title VARCHAR(256),
-    severity VARCHAR(32),
-    condition TEXT,
-    recommendation TEXT,
-    reference VARCHAR(256),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE safety_violations (
-    id SERIAL PRIMARY KEY,
-    experiment_id INT,
-    rule_id VARCHAR(64),
-    severity VARCHAR(32),
-    message TEXT,
-    expected JSONB,
-    observed JSONB,
-    timestamp TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX safety_violations_timestamp_idx 
-    ON safety_violations(timestamp DESC);
-```
+- All critical safety checks are deterministic and explainable
+- No safety decision depends on an LLM model
+- Alerts are returned with expected vs observed values and a recommendation
+- The rule engine remains compatible with FastAPI-backed mission monitoring
 
 ---
 
-## Future Enhancements
-
-- [ ] Dynamic rule loading (add rules without restart)
-- [ ] Machine learning for anomaly detection (non-safety path)
-- [ ] Predictive alerts (warn before violation)
-- [ ] Rule conflict detection
-- [ ] Explanation generation (why was alert issued?)
-
----
-
-## Questions & Support
-
-Contact module owner: Member 4
-
----
-
-**Last Updated**: 2024-01-15  
 **Status**: Ready for implementation
