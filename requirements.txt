@@ -1,0 +1,30 @@
+# Project EKA Requirements
+# Local-first computer vision and activity recognition system
+
+# Vision and Perception
+ultralytics>=8.0.0          # YOLOv8
+mediapipe>=0.10.0          # MediaPipe Pose and Hands
+opencv-python>=4.8.0       # OpenCV for video processing
+numpy>=1.24.0              # Numerical computing
+
+# Object Tracking
+bytetrack>=1.0.0           # ByteTrack for object tracking
+
+# Deep Learning
+torch>=2.0.0               # PyTorch
+torch-geometric>=2.3.0     # Graph neural networks (GCN)
+
+# Audio/TTS
+pyttsx3>=2.90              # Local text-to-speech
+
+# Data Processing
+pandas>=2.0.0              # Data manipulation and CSV handling
+
+# Development and Testing
+pytest>=7.0.0              # Testing framework
+pytest-cov>=4.0.0          # Coverage reporting
+
+# Code Quality (optional)
+black>=23.0.0              # Code formatting
+flake8>=6.0.0              # Linting
+mypy>=1.0.0                # Type checking
