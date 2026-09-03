@@ -1,4 +1,4 @@
-# Project EKA — Evolving Kognitive Assistant
+# Project EKA — Edge Kognitive Assistant
 
 A **local-first computer vision and activity recognition system** for observing and validating experiment procedures in real-time.
 
